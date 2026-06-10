@@ -1,14 +1,28 @@
 import { execa } from "execa";
 
 const dangerousPatterns = [
+  "rm ",
   "rm -rf",
+  "rimraf",
+  "rmdir",
+  "Remove-Item",
+  "fs.rm",
+  "rmSync",
+  "unlink",
+  "unlinkSync",
+
   "sudo",
   "mkfs",
   "dd ",
   ":(){",
   "chmod -R 777",
+
   "git push",
   "git reset --hard",
+  "git clean -fd",
+
+  "curl ",
+  "wget ",
 ];
 
 export async function bash(args: { command: string }) {

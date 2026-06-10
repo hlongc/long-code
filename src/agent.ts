@@ -2,6 +2,11 @@ import type OpenAI from "openai";
 import { client, MODEL } from "./model.js";
 import { systemPrompt } from "./prompts.js";
 import { tools, runTool } from "./tools/index.js";
+import {
+  askUserPermission,
+  checkDangerousCommand,
+  shouldAskPermission,
+} from "./permissions.js";
 
 type Message = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 
@@ -69,6 +74,40 @@ export async function runAgent(userInput: string) {
 
       console.log(`\n[Tool Call] ${toolName}`);
       console.log(args);
+
+      const dangerCheck = checkDangerousCommand(args);
+
+      if (toolName === "bash" && !dangerCheck.allowed) {
+        const deniedMessage = `拒绝执行：${dangerCheck.reason}。这是破坏性操作，禁止尝试通过其他等价命令绕过。`;
+
+        console.log(`\n[Permission Denied] ${deniedMessage}`);
+
+        messages.push({
+          role: "tool",
+          tool_call_id: toolCall.id,
+          content: deniedMessage,
+        });
+
+        continue;
+      }
+
+      if (shouldAskPermission(toolName, args)) {
+        const allowed = await askUserPermission(toolName, args);
+
+        if (!allowed) {
+          const deniedMessage = "用户拒绝执行该工具调用";
+
+          console.log(`\n[Permission Denied] ${deniedMessage}`);
+
+          messages.push({
+            role: "tool",
+            tool_call_id: toolCall.id,
+            content: deniedMessage,
+          });
+
+          continue;
+        }
+      }
 
       const result = await runTool(toolName, args);
 
