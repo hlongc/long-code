@@ -1,38 +1,14 @@
 import { execa } from "execa";
 import { runtimeContext } from "../runtimeContext.js";
-
-const dangerousPatterns = [
-  "rm ",
-  "rm -rf",
-  "rimraf",
-  "rmdir",
-  "Remove-Item",
-  "fs.rm",
-  "rmSync",
-  "unlink",
-  "unlinkSync",
-
-  "sudo",
-  "mkfs",
-  "dd ",
-  ":(){",
-  "chmod -R 777",
-
-  "git push",
-  "git reset --hard",
-  "git clean -fd",
-
-  "curl ",
-  "wget ",
-];
+import { checkDangerousCommand } from "../commandSafety.js";
 
 export async function bash(args: { command: string }) {
   const command = args.command.trim();
 
-  for (const pattern of dangerousPatterns) {
-    if (command.includes(pattern)) {
-      return `拒绝执行危险命令：${command}`;
-    }
+  const safetyDecision = checkDangerousCommand(command);
+
+  if (!safetyDecision.allowed) {
+    return `拒绝执行危险命令：${safetyDecision.reason}`;
   }
 
   const result = await execa(command, {

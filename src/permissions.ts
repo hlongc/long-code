@@ -1,6 +1,7 @@
 import readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import { allowExternalPath, inspectPathAccess } from "./pathSecurity.js";
+import { checkDangerousCommand } from "./commandSafety.js";
 
 export type PermissionDecision = {
   allowed: boolean;
@@ -19,31 +20,6 @@ const alwaysAllowCommands = [
   "pnpm -v",
   "node -v",
   "npm -v",
-];
-
-const dangerousPatterns = [
-  "rm ",
-  "rm -rf",
-  "rimraf",
-  "rmdir",
-  "Remove-Item",
-  "fs.rm",
-  "rmSync",
-  "unlink",
-  "unlinkSync",
-
-  "sudo",
-  "mkfs",
-  "dd ",
-  ":(){",
-  "chmod -R 777",
-
-  "git push",
-  "git reset --hard",
-  "git clean -fd",
-
-  "curl ",
-  "wget ",
 ];
 
 const pathTools = new Set([
@@ -146,13 +122,13 @@ export function checkDangerousBashCommand(args: unknown): PermissionDecision {
     };
   }
 
-  for (const pattern of dangerousPatterns) {
-    if (command.includes(pattern)) {
-      return {
-        allowed: false,
-        reason: `命中危险命令规则：${pattern}`,
-      };
-    }
+  const decision = checkDangerousCommand(command);
+
+  if (!decision.allowed) {
+    return {
+      allowed: false,
+      reason: decision.reason,
+    };
   }
 
   return {
