@@ -10,6 +10,8 @@ import { todoWrite } from "./todoWrite.js";
 import { todoRead } from "./todoRead.js";
 import { todoClear } from "./todoClear.js";
 import { runCheck } from "./runCheck.js";
+import { codeIndex } from "./codeIndex.js";
+import { codeSearch } from "./codeSearch.js";
 
 export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
@@ -219,6 +221,46 @@ export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "code_index",
+      description:
+        "扫描当前项目并建立代码索引。适合在需要理解代码库、跨文件搜索、定位功能实现前调用。",
+      parameters: {
+        type: "object",
+        properties: {
+          glob: {
+            type: "string",
+            description:
+              "索引文件范围，例如 **/*.ts。不传则默认索引 ts、tsx、js、jsx、json、md 文件。",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "code_search",
+      description:
+        "在已建立的代码索引中搜索相关代码片段。使用前应先调用 code_index。",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "搜索查询，例如 agent loop、permission、tool call",
+          },
+          limit: {
+            type: "number",
+            description: "返回结果数量，默认 5",
+          },
+        },
+        required: ["query"],
+      },
+    },
+  },
 ];
 
 export async function runTool(name: string, args: any) {
@@ -245,6 +287,10 @@ export async function runTool(name: string, args: any) {
       return todoClear();
     case "run_check":
       return runCheck(args);
+    case "code_index":
+      return codeIndex(args);
+    case "code_search":
+      return codeSearch(args);
     default:
       return `未知工具：${name}`;
   }

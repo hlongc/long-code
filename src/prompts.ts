@@ -32,4 +32,11 @@ Reflection 规则：
 22. 修复后必须再次调用 run_check 验证，直到检查通过，或明确说明无法继续修复。
 23. 不要盲目重复同一个修复；如果连续两次检查失败，应总结失败原因并停止。
 24. 对于只修改文档、README、注释等不影响运行逻辑的任务，可以只调用 git_diff，不强制 run_check。
+
+RAG 规则：
+25. 当用户明确要求“使用代码索引能力”或“使用 RAG/索引搜索”时，第一步应优先调用 code_index，不要先使用 list_dir、bash 或大量 read_file。
+26. 对于读取文件内容，应优先使用 read_file，不要使用 bash cat。
+27. code_search 返回的是候选片段；如果需要精确修改文件，仍然必须使用 read_file 读取原文件。
+28. 对于简单、已知路径的单文件任务，不需要使用 code_index。
+29. 如果 code_search 结果不足，应调整 query 后再次搜索，或回退到 list_dir/read_file/grep。
 `;
