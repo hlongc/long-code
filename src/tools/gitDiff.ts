@@ -1,8 +1,9 @@
 import { execa } from "execa";
+import { runtimeContext } from "../runtimeContext.js";
 
 async function runGit(args: string[]) {
   const result = await execa("git", args, {
-    cwd: process.cwd(),
+    cwd: runtimeContext.projectRoot,
   }).catch((error) => {
     return {
       stdout: error.stdout || "",

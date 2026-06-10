@@ -1,4 +1,5 @@
 import { execa } from "execa";
+import { runtimeContext } from "../runtimeContext.js";
 
 const dangerousPatterns = [
   "rm ",
@@ -36,7 +37,7 @@ export async function bash(args: { command: string }) {
 
   const result = await execa(command, {
     shell: true,
-    cwd: process.cwd(),
+    cwd: runtimeContext.projectRoot,
     timeout: 20_000,
   }).catch((error) => {
     return {

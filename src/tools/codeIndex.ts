@@ -2,6 +2,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import fg from "fast-glob";
 import { writeCodeChunks, type CodeChunk } from "../codeIndexStore.js";
+import { resolveProjectPath } from "../pathSecurity.js";
+import { runtimeContext } from "../runtimeContext.js";
 
 const defaultPatterns = ["**/*.{ts,tsx,js,jsx,json,md}"];
 
@@ -14,11 +16,22 @@ const ignorePatterns = [
   "pnpm-lock.yaml",
 ];
 
-export async function codeIndex(args: { glob?: string }) {
+export async function codeIndex(args: { glob?: string; dir?: string }) {
+  const indexDir = args.dir || ".";
+  const dirDecision = resolveProjectPath(indexDir);
+
+  if (!dirDecision.allowed) {
+    return [
+      `代码索引失败：${dirDecision.reason}`,
+      `absPath: ${dirDecision.absPath}`,
+      `项目外代码索引需要用户显式授权。`,
+    ].join("\n");
+  }
+
   const pattern = args.glob || defaultPatterns;
 
   const files = await fg(pattern, {
-    cwd: process.cwd(),
+    cwd: dirDecision.absPath,
     ignore: ignorePatterns,
     onlyFiles: true,
   });
@@ -26,20 +39,26 @@ export async function codeIndex(args: { glob?: string }) {
   const chunks: CodeChunk[] = [];
 
   for (const file of files) {
-    const absPath = path.resolve(process.cwd(), file);
+    const absPath = path.resolve(dirDecision.absPath, file);
     const content = await fs.readFile(absPath, "utf-8").catch(() => "");
 
     if (!content.trim()) {
       continue;
     }
 
-    chunks.push(...splitFileIntoChunks(file, content));
+    const displayPath = path.relative(runtimeContext.projectRoot, absPath);
+
+    chunks.push(...splitFileIntoChunks(displayPath, content));
   }
 
   writeCodeChunks(chunks);
 
+  const displayIndexDir =
+    path.relative(runtimeContext.projectRoot, dirDecision.absPath) || ".";
+
   return [
     `代码索引已建立。`,
+    `索引目录：${displayIndexDir}`,
     `文件数量：${files.length}`,
     `代码片段数量：${chunks.length}`,
   ].join("\n");

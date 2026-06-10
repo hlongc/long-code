@@ -1,11 +1,19 @@
 import fs from "node:fs/promises";
-import path from "node:path";
+import { resolveProjectPath } from "../pathSecurity.js";
 
 export async function readFile(args: { file: string }) {
-  const target = path.resolve(process.cwd(), args.file);
-  const content = await fs.readFile(target, "utf-8");
+  const decision = resolveProjectPath(args.file);
 
-  // 防止一次性塞爆上下文，先简单截断
+  if (!decision.allowed) {
+    return [
+      `读取失败：${decision.reason}`,
+      `absPath: ${decision.absPath}`,
+      `如确实需要访问项目外文件，请先获得用户授权。`,
+    ].join("\n");
+  }
+
+  const content = await fs.readFile(decision.absPath, "utf-8");
+
   const maxLength = 12000;
 
   if (content.length > maxLength) {

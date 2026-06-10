@@ -64,6 +64,11 @@ export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
             type: "string",
             description: "搜索文件范围，例如 **/*.ts",
           },
+          dir: {
+            type: "string",
+            description:
+              "搜索目录，默认当前项目根目录。项目外目录需要用户授权。",
+          },
         },
         required: ["query"],
       },
@@ -235,6 +240,11 @@ export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
             type: "string",
             description:
               "索引文件范围，例如 **/*.ts。不传则默认索引 ts、tsx、js、jsx、json、md 文件。",
+          },
+          dir: {
+            type: "string",
+            description:
+              "索引目录，默认当前项目根目录。项目外目录需要用户授权。",
           },
         },
       },

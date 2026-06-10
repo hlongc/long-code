@@ -1,14 +1,22 @@
 import fs from "node:fs/promises";
-import path from "node:path";
+import { resolveProjectPath } from "../pathSecurity.js";
 
 export async function editFile(args: {
   file: string;
   oldText: string;
   newText: string;
 }) {
-  const target = path.resolve(process.cwd(), args.file);
+  const decision = resolveProjectPath(args.file);
 
-  const content = await fs.readFile(target, "utf-8");
+  if (!decision.allowed) {
+    return [
+      `编辑失败：${decision.reason}`,
+      `absPath: ${decision.absPath}`,
+      `项目外编辑需要用户显式授权。`,
+    ].join("\n");
+  }
+
+  const content = await fs.readFile(decision.absPath, "utf-8");
 
   if (!content.includes(args.oldText)) {
     return [
@@ -21,7 +29,7 @@ export async function editFile(args: {
 
   const nextContent = content.replace(args.oldText, args.newText);
 
-  await fs.writeFile(target, nextContent, "utf-8");
+  await fs.writeFile(decision.absPath, nextContent, "utf-8");
 
   return [
     `编辑成功：${args.file}`,

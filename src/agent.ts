@@ -3,8 +3,11 @@ import { client, MODEL } from "./model.js";
 import { systemPrompt } from "./prompts.js";
 import { tools, runTool } from "./tools/index.js";
 import {
+  askExternalPathPermission,
   askUserPermission,
+  authorizeExternalPathForSession,
   checkDangerousBashCommand,
+  shouldAskExternalPathPermission,
   shouldAskPermission,
 } from "./permissions.js";
 
@@ -104,6 +107,31 @@ export async function runAgent(userInput: string) {
         }
       }
 
+      const externalPathAccess = shouldAskExternalPathPermission(
+        toolName,
+        args,
+      );
+
+      if (externalPathAccess) {
+        const allowed = await askExternalPathPermission(externalPathAccess);
+
+        if (!allowed) {
+          const deniedMessage = `用户拒绝访问项目外路径：${externalPathAccess.absPath}`;
+
+          console.log(`\n[External Path Denied] ${deniedMessage}`);
+
+          messages.push({
+            role: "tool",
+            tool_call_id: toolCall.id,
+            content: deniedMessage,
+          });
+
+          continue;
+        }
+
+        authorizeExternalPathForSession(externalPathAccess.absPath);
+      }
+
       if (shouldAskPermission(toolName, args)) {
         const permissionResult = await askUserPermission(toolName, args);
 
@@ -123,15 +151,24 @@ export async function runAgent(userInput: string) {
         }
       }
 
-      const result = await runTool(toolName, args);
+      let result: string;
+
+      try {
+        result = String(await runTool(toolName, args));
+      } catch (error) {
+        result =
+          error instanceof Error
+            ? `工具执行失败：${error.message}`
+            : `工具执行失败：${String(error)}`;
+      }
 
       console.log(`\n[Tool Result]`);
-      console.log(String(result).slice(0, 1000));
+      console.log(result.slice(0, 1000));
 
       messages.push({
         role: "tool",
         tool_call_id: toolCall.id,
-        content: String(result),
+        content: result,
       });
     }
   }

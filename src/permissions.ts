@@ -1,5 +1,6 @@
 import readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
+import { allowExternalPath, inspectPathAccess } from "./pathSecurity.js";
 
 export type PermissionDecision = {
   allowed: boolean;
@@ -44,6 +45,74 @@ const dangerousPatterns = [
   "curl ",
   "wget ",
 ];
+
+const pathTools = new Set([
+  "read_file",
+  "write_file",
+  "edit_file",
+  "list_dir",
+  "grep",
+  "code_index",
+]);
+
+export function shouldAskExternalPathPermission(
+  toolName: string,
+  args: unknown,
+) {
+  const targetPath = getToolPath(toolName, args);
+
+  if (!targetPath) {
+    return null;
+  }
+
+  const access = inspectPathAccess(targetPath);
+
+  if (!access.isOutsideProject || access.alreadyAllowed) {
+    return null;
+  }
+
+  return access;
+}
+
+export function authorizeExternalPathForSession(absPath: string) {
+  allowExternalPath(absPath);
+}
+
+function getToolPath(toolName: string, args: unknown) {
+  if (!pathTools.has(toolName)) {
+    return "";
+  }
+
+  if (typeof args !== "object" || args === null) {
+    return "";
+  }
+
+  if (
+    toolName === "list_dir" &&
+    "dir" in args &&
+    typeof args.dir === "string"
+  ) {
+    return args.dir;
+  }
+
+  if (toolName === "grep" && "dir" in args && typeof args.dir === "string") {
+    return args.dir;
+  }
+
+  if (
+    toolName === "code_index" &&
+    "dir" in args &&
+    typeof args.dir === "string"
+  ) {
+    return args.dir;
+  }
+
+  if ("file" in args && typeof args.file === "string") {
+    return args.file;
+  }
+
+  return "";
+}
 
 export function shouldAskPermission(toolName: string, args: unknown): boolean {
   if (toolName === "edit_file" || toolName === "write_file") {
@@ -159,4 +228,24 @@ function getCommand(args: unknown) {
   }
 
   return "";
+}
+
+export async function askExternalPathPermission(access: {
+  inputPath: string;
+  absPath: string;
+}) {
+  const rl = readline.createInterface({ input, output });
+
+  console.log("\n[External Path Access Required]");
+  console.log(`Input Path: ${access.inputPath}`);
+  console.log(`Absolute Path: ${access.absPath}`);
+  console.log("该路径位于当前项目目录之外。");
+
+  const answer = await rl.question(
+    "是否允许本次会话访问该外部路径？[y] 允许 / 其他任意键拒绝：",
+  );
+
+  rl.close();
+
+  return answer.trim().toLowerCase() === "y";
 }
