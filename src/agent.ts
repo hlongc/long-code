@@ -4,7 +4,7 @@ import { systemPrompt } from "./prompts.js";
 import { tools, runTool } from "./tools/index.js";
 import {
   askUserPermission,
-  checkDangerousCommand,
+  checkDangerousBashCommand,
   shouldAskPermission,
 } from "./permissions.js";
 
@@ -66,36 +66,50 @@ export async function runAgent(userInput: string) {
       const rawArgs = toolCall.function.arguments || "{}";
 
       let args: any = {};
+
       try {
         args = JSON.parse(rawArgs);
       } catch {
-        args = {};
-      }
+        const errorMessage = `工具参数解析失败：${rawArgs}`;
 
-      console.log(`\n[Tool Call] ${toolName}`);
-      console.log(args);
-
-      const dangerCheck = checkDangerousCommand(args);
-
-      if (toolName === "bash" && !dangerCheck.allowed) {
-        const deniedMessage = `拒绝执行：${dangerCheck.reason}。这是破坏性操作，禁止尝试通过其他等价命令绕过。`;
-
-        console.log(`\n[Permission Denied] ${deniedMessage}`);
+        console.log(`\n[Tool Args Error] ${errorMessage}`);
 
         messages.push({
           role: "tool",
           tool_call_id: toolCall.id,
-          content: deniedMessage,
+          content: errorMessage,
         });
 
         continue;
       }
 
-      if (shouldAskPermission(toolName, args)) {
-        const allowed = await askUserPermission(toolName, args);
+      console.log(`\n[Tool Call] ${toolName}`);
+      console.log(args);
 
-        if (!allowed) {
-          const deniedMessage = "用户拒绝执行该工具调用";
+      if (toolName === "bash") {
+        const dangerCheck = checkDangerousBashCommand(args);
+
+        if (!dangerCheck.allowed) {
+          const deniedMessage = `拒绝执行：${dangerCheck.reason}。这是破坏性操作，禁止尝试通过其他等价命令绕过。`;
+
+          console.log(`\n[Permission Denied] ${deniedMessage}`);
+
+          messages.push({
+            role: "tool",
+            tool_call_id: toolCall.id,
+            content: deniedMessage,
+          });
+
+          continue;
+        }
+      }
+
+      if (shouldAskPermission(toolName, args)) {
+        const permissionResult = await askUserPermission(toolName, args);
+
+        if (permissionResult === "deny") {
+          const deniedMessage =
+            "用户拒绝执行该工具调用，禁止尝试通过其他等价方式绕过。";
 
           console.log(`\n[Permission Denied] ${deniedMessage}`);
 

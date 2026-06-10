@@ -3,6 +3,9 @@ import { listDir } from "./listDir.js";
 import { readFile } from "./readFile.js";
 import { grep } from "./grep.js";
 import { bash } from "./bash.js";
+import { editFile } from "./editFile.js";
+import { writeFile } from "./writeFile.js";
+import { gitDiff } from "./gitDiff.js";
 
 export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
@@ -76,6 +79,65 @@ export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "edit_file",
+      description:
+        "替换文件中的一段文本。修改文件前必须先 read_file，oldText 必须是文件中真实存在的完整文本片段。",
+      parameters: {
+        type: "object",
+        properties: {
+          file: {
+            type: "string",
+            description: "要修改的文件路径",
+          },
+          oldText: {
+            type: "string",
+            description: "要被替换的原始文本，必须与文件内容精确匹配",
+          },
+          newText: {
+            type: "string",
+            description: "替换后的新文本",
+          },
+        },
+        required: ["file", "oldText", "newText"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "write_file",
+      description:
+        "创建或覆盖一个文本文件。这个工具会写入完整文件内容，使用前必须非常谨慎。",
+      parameters: {
+        type: "object",
+        properties: {
+          file: {
+            type: "string",
+            description: "要写入的文件路径",
+          },
+          content: {
+            type: "string",
+            description: "完整文件内容",
+          },
+        },
+        required: ["file", "content"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "git_diff",
+      description: "查看当前 git 工作区的未提交变更",
+      parameters: {
+        type: "object",
+        properties: {},
+      },
+    },
+  },
 ];
 
 export async function runTool(name: string, args: any) {
@@ -88,6 +150,12 @@ export async function runTool(name: string, args: any) {
       return grep(args);
     case "bash":
       return bash(args);
+    case "edit_file":
+      return editFile(args);
+    case "write_file":
+      return writeFile(args);
+    case "git_diff":
+      return gitDiff();
     default:
       return `未知工具：${name}`;
   }
