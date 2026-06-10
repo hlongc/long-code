@@ -6,6 +6,9 @@ import { bash } from "./bash.js";
 import { editFile } from "./editFile.js";
 import { writeFile } from "./writeFile.js";
 import { gitDiff } from "./gitDiff.js";
+import { todoWrite } from "./todoWrite.js";
+import { todoRead } from "./todoRead.js";
+import { todoClear } from "./todoClear.js";
 
 export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
@@ -138,6 +141,65 @@ export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "todo_write",
+      description:
+        "创建或更新当前任务的 todo 列表。适合复杂任务开始前制定计划，以及执行过程中更新任务状态。",
+      parameters: {
+        type: "object",
+        properties: {
+          todos: {
+            type: "array",
+            description: "todo 列表",
+            items: {
+              type: "object",
+              properties: {
+                id: {
+                  type: "string",
+                  description: "todo 唯一 ID，例如 1、2、3",
+                },
+                content: {
+                  type: "string",
+                  description: "todo 内容",
+                },
+                status: {
+                  type: "string",
+                  enum: ["pending", "in_progress", "completed"],
+                  description: "任务状态",
+                },
+              },
+              required: ["id", "content", "status"],
+            },
+          },
+        },
+        required: ["todos"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "todo_read",
+      description: "读取当前任务的 todo 列表",
+      parameters: {
+        type: "object",
+        properties: {},
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "todo_clear",
+      description: "清空当前任务的 todo 列表。通常在任务完成后使用。",
+      parameters: {
+        type: "object",
+        properties: {},
+      },
+    },
+  },
 ];
 
 export async function runTool(name: string, args: any) {
@@ -156,6 +218,12 @@ export async function runTool(name: string, args: any) {
       return writeFile(args);
     case "git_diff":
       return gitDiff();
+    case "todo_write":
+      return todoWrite(args);
+    case "todo_read":
+      return todoRead();
+    case "todo_clear":
+      return todoClear();
     default:
       return `未知工具：${name}`;
   }
