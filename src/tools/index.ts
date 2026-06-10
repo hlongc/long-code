@@ -12,6 +12,7 @@ import { todoClear } from "./todoClear.js";
 import { runCheck } from "./runCheck.js";
 import { codeIndex } from "./codeIndex.js";
 import { codeSearch } from "./codeSearch.js";
+import { runSubAgent } from "./runSubAgent.js";
 
 export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
@@ -261,6 +262,34 @@ export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "run_subagent",
+      description:
+        "调用一个专门角色的子 Agent 来完成分析、审查、测试结果分析或文档撰写。子 Agent 不会直接访问文件系统，只会基于传入的 task 和 context 进行分析。",
+      parameters: {
+        type: "object",
+        properties: {
+          agent: {
+            type: "string",
+            enum: ["code_reader", "reviewer", "tester", "writer"],
+            description: "要调用的子 Agent 名称",
+          },
+          task: {
+            type: "string",
+            description: "交给子 Agent 的具体任务",
+          },
+          context: {
+            type: "string",
+            description:
+              "提供给子 Agent 的上下文，例如代码片段、diff、检查结果、搜索结果等",
+          },
+        },
+        required: ["agent", "task"],
+      },
+    },
+  },
 ];
 
 export async function runTool(name: string, args: any) {
@@ -291,6 +320,8 @@ export async function runTool(name: string, args: any) {
       return codeIndex(args);
     case "code_search":
       return codeSearch(args);
+    case "run_subagent":
+      return runSubAgent(args);
     default:
       return `未知工具：${name}`;
   }

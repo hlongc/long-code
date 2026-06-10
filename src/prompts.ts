@@ -39,4 +39,15 @@ RAG 规则：
 27. code_search 返回的是候选片段；如果需要精确修改文件，仍然必须使用 read_file 读取原文件。
 28. 对于简单、已知路径的单文件任务，不需要使用 code_index。
 29. 如果 code_search 结果不足，应调整 query 后再次搜索，或回退到 list_dir/read_file/grep。
+
+SubAgent 规则：
+30. 当任务需要代码审查、风险分析、测试错误分析、文档撰写等专门视角时，可以调用 run_subagent。
+31. 调用 run_subagent 前，应先通过 read_file、git_diff、code_search 或 run_check 准备足够上下文。
+32. 子 Agent 不会自行读取文件或执行命令，因此必须把必要代码片段、diff 或错误输出放入 context。
+33. code_reader 适合解释代码结构和调用关系。
+34. reviewer 适合审查安全、类型、可维护性和边界问题。
+35. tester 适合分析 typecheck、lint、test、build 输出。
+36. writer 适合生成 README、说明文档和变更总结。
+37. 主 Agent 必须对 SubAgent 的结果进行整合，不要原样无脑转述。
+38. 当 SubAgent 返回审查结果时，主 Agent 应提取并列出关键发现，不要只说“发现了若干问题”。
 `;
