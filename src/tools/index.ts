@@ -79,13 +79,15 @@ export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function" as const,
     function: {
       name: "bash",
-      description: "在当前项目目录执行安全的 shell 命令",
+      description:
+        "高风险工具：执行自由 shell 命令。只有当 safe_bash、run_check、git_diff 等安全工具无法满足需求，并且用户明确要求执行普通 shell 命令时才可使用。不要优先使用该工具。",
       parameters: {
         type: "object",
         properties: {
           command: {
             type: "string",
-            description: "要执行的 shell 命令",
+            description:
+              "要执行的 shell 命令。高风险，可能访问或修改项目外资源。",
           },
         },
         required: ["command"],

@@ -10,18 +10,6 @@ export type PermissionDecision = {
 
 export type PermissionResult = "allow" | "deny" | "always";
 
-const alwaysAllowCommands = [
-  "pwd",
-  "ls",
-  "ls -la",
-  "git status",
-  "git diff",
-  "git branch",
-  "pnpm -v",
-  "node -v",
-  "npm -v",
-];
-
 const pathTools = new Set([
   "read_file",
   "write_file",
@@ -90,26 +78,10 @@ function getToolPath(toolName: string, args: unknown) {
   return "";
 }
 
-export function shouldAskPermission(toolName: string, args: unknown): boolean {
-  if (toolName === "edit_file" || toolName === "write_file") {
-    return true;
-  }
-
-  if (toolName !== "bash") {
-    return false;
-  }
-
-  const command = getCommand(args);
-
-  if (!command) {
-    return true;
-  }
-
-  if (alwaysAllowCommands.includes(command)) {
-    return false;
-  }
-
-  return true;
+export function shouldAskPermission(toolName: string, _args: unknown): boolean {
+  return (
+    toolName === "edit_file" || toolName === "write_file" || toolName === "bash"
+  );
 }
 
 export function checkDangerousBashCommand(args: unknown): PermissionDecision {

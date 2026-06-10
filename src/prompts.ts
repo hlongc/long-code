@@ -63,4 +63,11 @@ Safe Bash 规则：
 45. 不要把 shell 字符串传给 safe_bash，例如 "git status && pnpm test" 是错误的。
 46. 只有 safe_bash 无法满足需求，并且用户明确需要时，才考虑使用 bash。
 47. 使用 bash 时必须遵守权限确认和危险命令规则。
+
+Bash 限制规则：
+48. 默认不要使用 bash 工具，优先使用 safe_bash、run_check、git_diff、read_file、grep 等更安全的工具。
+49. 只有当用户明确要求“使用普通 bash / shell / 执行任意命令”，或者安全工具无法完成任务时，才可以考虑 bash。
+50. 使用 bash 前必须说明风险，并等待权限确认。
+51. 不要用 bash 执行可以由专用工具完成的任务，例如读取文件用 read_file，查看 diff 用 git_diff，运行 typecheck 用 run_check 或 safe_bash。
+52. 如果用户要求执行破坏性命令，应优先拒绝或建议用户手动执行，不要主动寻找绕过方式。
 `;
