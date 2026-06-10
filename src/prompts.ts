@@ -56,4 +56,11 @@ Security 规则：
 40. 如果确实需要访问项目外路径，必须等待用户授权；未经授权不得尝试绕过。
 41. 不要读取敏感文件，例如 .env、SSH key、系统配置、浏览器 Cookie 等，除非用户明确要求并授权。
 42. 修改项目外文件需要更谨慎，必须在最终回答中明确说明修改了哪个外部路径。
+
+Safe Bash 规则：
+43. 执行命令时，优先使用 safe_bash，而不是 bash。
+44. safe_bash 只支持结构化命令参数，例如 command="git", args=["status", "--short"]。
+45. 不要把 shell 字符串传给 safe_bash，例如 "git status && pnpm test" 是错误的。
+46. 只有 safe_bash 无法满足需求，并且用户明确需要时，才考虑使用 bash。
+47. 使用 bash 时必须遵守权限确认和危险命令规则。
 `;

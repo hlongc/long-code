@@ -13,6 +13,7 @@ import { runCheck } from "./runCheck.js";
 import { codeIndex } from "./codeIndex.js";
 import { codeSearch } from "./codeSearch.js";
 import { runSubAgent } from "./runSubAgent.js";
+import { safeBash } from "./safeBash.js";
 
 export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
@@ -300,6 +301,32 @@ export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "safe_bash",
+      description:
+        "执行受限的安全命令。只支持白名单命令，例如 git status、git diff、pnpm run typecheck、pnpm run test、node -v 等。优先使用该工具，不要优先使用 bash。",
+      parameters: {
+        type: "object",
+        properties: {
+          command: {
+            type: "string",
+            description: "命令名，例如 git、pnpm、node、npm",
+          },
+          args: {
+            type: "array",
+            items: {
+              type: "string",
+            },
+            description:
+              "命令参数，例如 ['status', '--short'] 或 ['run', 'typecheck']",
+          },
+        },
+        required: ["command"],
+      },
+    },
+  },
 ];
 
 export async function runTool(name: string, args: any) {
@@ -332,6 +359,8 @@ export async function runTool(name: string, args: any) {
       return codeSearch(args);
     case "run_subagent":
       return runSubAgent(args);
+    case "safe_bash":
+      return safeBash(args);
     default:
       return `未知工具：${name}`;
   }
