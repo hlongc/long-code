@@ -9,6 +9,7 @@ import { gitDiff } from "./gitDiff.js";
 import { todoWrite } from "./todoWrite.js";
 import { todoRead } from "./todoRead.js";
 import { todoClear } from "./todoClear.js";
+import { runCheck } from "./runCheck.js";
 
 export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
@@ -200,6 +201,24 @@ export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "run_check",
+      description:
+        "运行项目检查命令，例如 typecheck、lint、test 或 build。修改代码后应使用该工具验证结果。",
+      parameters: {
+        type: "object",
+        properties: {
+          script: {
+            type: "string",
+            description:
+              "要运行的 package.json scripts 名称，例如 typecheck、lint、test、build。不传则自动选择一个合适的检查脚本。",
+          },
+        },
+      },
+    },
+  },
 ];
 
 export async function runTool(name: string, args: any) {
@@ -224,6 +243,8 @@ export async function runTool(name: string, args: any) {
       return todoRead();
     case "todo_clear":
       return todoClear();
+    case "run_check":
+      return runCheck(args);
     default:
       return `未知工具：${name}`;
   }
