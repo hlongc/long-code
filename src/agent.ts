@@ -10,6 +10,10 @@ import {
   shouldAskExternalPathPermission,
   shouldAskPermission,
 } from "./permissions.js";
+import {
+  allowPermissionForSession,
+  isPermissionAllowedForSession,
+} from "./permissionSession.js";
 
 type Message = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 
@@ -133,21 +137,29 @@ export async function runAgent(userInput: string) {
       }
 
       if (shouldAskPermission(toolName, args)) {
-        const permissionResult = await askUserPermission(toolName, args);
+        if (!isPermissionAllowedForSession(toolName, args)) {
+          const permissionResult = await askUserPermission(toolName, args);
 
-        if (permissionResult === "deny") {
-          const deniedMessage =
-            "用户拒绝执行该工具调用，禁止尝试通过其他等价方式绕过。";
+          if (permissionResult === "deny") {
+            const deniedMessage =
+              "用户拒绝执行该工具调用，禁止尝试通过其他等价方式绕过。";
 
-          console.log(`\n[Permission Denied] ${deniedMessage}`);
+            console.log(`\n[Permission Denied] ${deniedMessage}`);
 
-          messages.push({
-            role: "tool",
-            tool_call_id: toolCall.id,
-            content: deniedMessage,
-          });
+            messages.push({
+              role: "tool",
+              tool_call_id: toolCall.id,
+              content: deniedMessage,
+            });
 
-          continue;
+            continue;
+          }
+
+          if (permissionResult === "always") {
+            allowPermissionForSession(toolName, args);
+          }
+        } else {
+          console.log(`\n[Permission Auto Allowed] ${toolName}`);
         }
       }
 
