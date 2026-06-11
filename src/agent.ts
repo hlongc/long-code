@@ -1,5 +1,6 @@
 import type OpenAI from "openai";
-import { client, MODEL } from "./model.js";
+import { client, getModel } from "./model.js";
+import { runtimeContext } from "./runtimeContext.js";
 import { systemPrompt } from "./prompts.js";
 import { tools, runTool } from "./tools/index.js";
 import {
@@ -32,13 +33,13 @@ export async function runAgent(userInput: string) {
     },
   ];
 
-  const maxSteps = 15;
+  const maxSteps = runtimeContext.maxSteps;
 
   for (let step = 1; step <= maxSteps; step++) {
     console.log(`\n===== Agent Step ${step} =====`);
 
     const response = await client.chat.completions.create({
-      model: MODEL,
+      model: getModel(),
       messages,
       tools,
       tool_choice: "auto",

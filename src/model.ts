@@ -6,4 +6,12 @@ export const client = new OpenAI({
   baseURL: process.env.OPENAI_BASE_URL,
 });
 
-export const MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+let currentModel = process.env.OPENAI_MODEL || "gpt-4o-mini";
+
+export function setModel(model: string) {
+  currentModel = model;
+}
+
+export function getModel() {
+  return currentModel;
+}

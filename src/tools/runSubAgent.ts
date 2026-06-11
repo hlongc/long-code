@@ -1,4 +1,4 @@
-import { client, MODEL } from "../model.js";
+import { client, getModel } from "../model.js";
 import { subAgents, type SubAgentName } from "../subagents.js";
 
 export async function runSubAgent(args: {
@@ -16,7 +16,7 @@ export async function runSubAgent(args: {
   }
 
   const response = await client.chat.completions.create({
-    model: MODEL,
+    model: getModel(),
     messages: [
       {
         role: "system",
