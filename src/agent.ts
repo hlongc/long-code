@@ -9,6 +9,8 @@ import {
   checkDangerousBashCommand,
   shouldAskExternalPathPermission,
   shouldAskPermission,
+  askSensitiveFilePermission,
+  shouldAskSensitiveFilePermission,
 } from "./permissions.js";
 import {
   allowPermissionForSession,
@@ -134,6 +136,29 @@ export async function runAgent(userInput: string) {
         }
 
         authorizeExternalPathForSession(externalPathAccess.absPath);
+      }
+
+      const sensitiveFileAccess = shouldAskSensitiveFilePermission(
+        toolName,
+        args,
+      );
+
+      if (sensitiveFileAccess) {
+        const allowed = await askSensitiveFilePermission(sensitiveFileAccess);
+
+        if (!allowed) {
+          const deniedMessage = `用户拒绝或系统阻止访问敏感文件：${sensitiveFileAccess.inputPath}，原因：${sensitiveFileAccess.reason}`;
+
+          console.log(`\n[Sensitive File Denied] ${deniedMessage}`);
+
+          messages.push({
+            role: "tool",
+            tool_call_id: toolCall.id,
+            content: deniedMessage,
+          });
+
+          continue;
+        }
       }
 
       if (shouldAskPermission(toolName, args)) {

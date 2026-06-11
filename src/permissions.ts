@@ -2,6 +2,8 @@ import readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import { allowExternalPath, inspectPathAccess } from "./pathSecurity.js";
 import { checkDangerousCommand } from "./commandSafety.js";
+import { resolveProjectPath } from "./pathSecurity.js";
+import { inspectSensitiveFile } from "./sensitiveFiles.js";
 
 export type PermissionDecision = {
   allowed: boolean;
@@ -19,6 +21,78 @@ const pathTools = new Set([
   "code_index",
 ]);
 
+const sensitiveFileTools = new Set(["read_file", "write_file", "edit_file"]);
+
+export function shouldAskSensitiveFilePermission(
+  toolName: string,
+  args: unknown,
+) {
+  if (!sensitiveFileTools.has(toolName)) {
+    return null;
+  }
+
+  if (typeof args !== "object" || args === null) {
+    return null;
+  }
+
+  if (!("file" in args) || typeof args.file !== "string") {
+    return null;
+  }
+
+  const pathDecision = resolveProjectPath(args.file);
+
+  if (!pathDecision.allowed) {
+    return null;
+  }
+
+  const sensitiveDecision = inspectSensitiveFile(pathDecision.absPath);
+
+  if (!sensitiveDecision.sensitive) {
+    return null;
+  }
+
+  return {
+    toolName,
+    inputPath: args.file,
+    absPath: pathDecision.absPath,
+    level: sensitiveDecision.level,
+    reason: sensitiveDecision.reason,
+  };
+}
+
+export async function askSensitiveFilePermission(access: {
+  toolName: string;
+  inputPath: string;
+  absPath: string;
+  level: "warning" | "blocked";
+  reason: string;
+}) {
+  if (access.level === "blocked") {
+    console.log("\n[Sensitive File Blocked]");
+    console.log(`Tool: ${access.toolName}`);
+    console.log(`Path: ${access.inputPath}`);
+    console.log(`Reason: ${access.reason}`);
+    console.log("该文件被默认阻止访问。");
+
+    return false;
+  }
+
+  const rl = readline.createInterface({ input, output });
+
+  console.log("\n[Sensitive File Access Required]");
+  console.log(`Tool: ${access.toolName}`);
+  console.log(`Path: ${access.inputPath}`);
+  console.log(`Absolute Path: ${access.absPath}`);
+  console.log(`Reason: ${access.reason}`);
+
+  const answer = await rl.question(
+    "该文件可能包含密钥、令牌或敏感配置，是否允许访问？[y] 允许 / 其他任意键拒绝：",
+  );
+
+  rl.close();
+
+  return answer.trim().toLowerCase() === "y";
+}
 export function shouldAskExternalPathPermission(
   toolName: string,
   args: unknown,
