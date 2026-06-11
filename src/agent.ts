@@ -16,6 +16,7 @@ import {
   allowPermissionForSession,
   isPermissionAllowedForSession,
 } from "./permissionSession.js";
+import { renderMarkdown } from "./terminalMarkdown.js";
 
 type Message = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 
@@ -53,8 +54,13 @@ export async function runAgent(userInput: string) {
     // 没有工具调用，说明模型已经准备好回答
     if (!message.tool_calls || message.tool_calls.length === 0) {
       console.log("\n===== Final Answer =====\n");
-      console.log(message.content);
-      return message.content;
+      const finalContent = message.content || "";
+
+      const rendered = await renderMarkdown(finalContent);
+
+      console.log(rendered);
+
+      return finalContent;
     }
 
     // 执行工具调用
