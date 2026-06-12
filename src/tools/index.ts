@@ -351,6 +351,32 @@ export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "request_tools",
+      description:
+        "请求启用更多工具。当当前可用工具不足以完成任务时调用。该工具只请求扩展工具能力，不直接读取、修改文件或执行命令。",
+      parameters: {
+        type: "object",
+        properties: {
+          tools: {
+            type: "array",
+            items: {
+              type: "string",
+            },
+            description:
+              "希望启用的工具名称，例如 ['run_subagent', 'git_diff', 'run_check']",
+          },
+          reason: {
+            type: "string",
+            description: "请求启用这些工具的原因",
+          },
+        },
+        required: ["tools"],
+      },
+    },
+  },
 ];
 
 export async function runTool(name: string, args: any) {

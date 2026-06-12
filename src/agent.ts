@@ -29,7 +29,7 @@ type Message = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 
 export async function runAgent(userInput: string) {
   const enabledToolNames = selectToolNames(userInput);
-  const enabledTools = filterToolsByNames(enabledToolNames);
+  let enabledTools = filterToolsByNames(enabledToolNames);
 
   const messages: Message[] = [
     {
@@ -138,6 +138,26 @@ export async function runAgent(userInput: string) {
 
           continue;
         }
+      }
+
+      if (toolName === "request_tools") {
+        const requestedTools = Array.isArray(args.tools) ? args.tools : [];
+
+        for (const name of requestedTools) {
+          enabledToolNames.add(name);
+        }
+
+        enabledTools = filterToolsByNames(enabledToolNames);
+
+        const result = `已启用工具：${requestedTools.join(", ")}`;
+
+        messages.push({
+          role: "tool",
+          tool_call_id: toolCall.id,
+          content: result,
+        });
+
+        continue;
       }
 
       const externalPathAccess = shouldAskExternalPathPermission(
