@@ -15,6 +15,7 @@ import { codeSearch } from "./codeSearch.js";
 import { runSubAgent } from "./runSubAgent.js";
 import { safeBash } from "./safeBash.js";
 import { codeIndexStatus } from "./codeIndexStatus.js";
+import { gitStatus } from "./gitStatus.js";
 
 export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
@@ -318,7 +319,7 @@ export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: "safe_bash",
       description:
-        "执行受限的安全命令。只支持白名单命令，例如 git status、git diff、pnpm run typecheck、pnpm run test、node -v 等。优先使用该工具，不要优先使用 bash。注意：如果用户要求“项目检查/运行检查/验证项目/typecheck/lint/test/build”，应优先使用 run_check，而不是 safe_bash。",
+        "执行受限的安全命令。只支持白名单命令，例如 git status、git diff、node -v 等。不要用它运行项目检查；当用户要求项目检查、typecheck、lint、test 或 build 时，必须优先使用 run_check。只有 run_check 不可用或用户明确要求 safe_bash 时才使用该工具。",
       parameters: {
         type: "object",
         properties: {
@@ -377,6 +378,18 @@ export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "git_status",
+      description:
+        "查看当前 Git 状态，包括当前分支、工作区变更和最近一次提交。适合在修改前后了解仓库状态。",
+      parameters: {
+        type: "object",
+        properties: {},
+      },
+    },
+  },
 ];
 
 export async function runTool(name: string, args: any) {
@@ -413,6 +426,8 @@ export async function runTool(name: string, args: any) {
       return safeBash(args);
     case "code_index_status":
       return codeIndexStatus();
+    case "git_status":
+      return gitStatus();
     default:
       return `未知工具：${name}`;
   }

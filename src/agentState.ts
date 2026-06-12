@@ -14,6 +14,12 @@ export type AgentState = {
   toolErrors: string[];
   inspectedDiff: boolean;
   checks: CheckRecord[];
+  git?: {
+    branch?: string;
+    dirty: boolean;
+    lastCommit?: string;
+    statusLines: string[];
+  };
 };
 
 export function createAgentState(userInput: string): AgentState {
@@ -87,6 +93,10 @@ export function recordToolEffect(args: {
     state.inspectedDiff = true;
   }
 
+  if (toolName === "git_status") {
+    state.git = parseGitStatus(result);
+  }
+
   if (toolName === "run_check") {
     state.checks.push({
       script:
@@ -105,6 +115,31 @@ export function recordToolEffect(args: {
   }
 }
 
+function parseGitStatus(result: string) {
+  const branch = result.match(/当前分支：(.+)/)?.[1]?.trim();
+  const lastCommit = result.match(/最近提交：\n(.+)/)?.[1]?.trim();
+
+  const statusSection = result
+    .split("工作区状态：")[1]
+    ?.split("最近提交：")[0]
+    ?.trim();
+
+  const statusLines =
+    statusSection && statusSection !== "工作区干净"
+      ? statusSection
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean)
+      : [];
+
+  return {
+    branch,
+    dirty: statusLines.length > 0,
+    lastCommit,
+    statusLines,
+  };
+}
+
 export function recordDeniedAction(state: AgentState, message: string) {
   state.deniedActions.push(message);
 }
@@ -121,6 +156,18 @@ export function formatAgentStateSummary(state: AgentState) {
       ? `修改文件：${state.modifiedFiles.join(", ")}`
       : "",
     state.inspectedDiff ? "已查看 git diff：是" : "",
+    state.git
+      ? [
+          `当前分支：${state.git.branch || "unknown"}`,
+          `工作区状态：${state.git.dirty ? "有未提交变更" : "干净"}`,
+          state.git.lastCommit ? `最近提交：${state.git.lastCommit}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n")
+      : "",
+    state.git?.statusLines.length
+      ? `工作区变更文件：${state.git.statusLines.join(", ")}`
+      : "",
     state.deniedActions.length
       ? `被拒绝操作：${state.deniedActions.join(" | ")}`
       : "",

@@ -13,6 +13,7 @@ export const autoGrantTools = new Set([
   "git_diff",
   "run_subagent",
   "safe_bash",
+  "git_status",
 ]);
 
 export const restrictedTools = new Set(["edit_file", "write_file", "bash"]);

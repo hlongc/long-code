@@ -12,6 +12,7 @@ export function selectToolNames(userInput: string) {
     "todo_read",
     "todo_clear",
     "request_tools",
+    "git_status",
   ];
 
   const editTools = ["edit_file", "write_file", "git_diff", "run_check"];
