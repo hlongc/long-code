@@ -11,6 +11,7 @@ import {
   shouldAskPermission,
   askSensitiveFilePermission,
   shouldAskSensitiveFilePermission,
+  askToolCapabilityPermission,
 } from "./permissions.js";
 import {
   allowPermissionForSession,
@@ -150,14 +151,34 @@ export async function runAgent(userInput: string) {
           enabledToolNames.add(name);
         }
 
+        let approvedRestrictedTools: string[] = [];
+
+        if (decision.denied.length > 0) {
+          const allowed = await askToolCapabilityPermission({
+            tools: decision.denied,
+            reason: typeof args.reason === "string" ? args.reason : undefined,
+          });
+
+          if (allowed) {
+            approvedRestrictedTools = decision.denied;
+
+            for (const name of approvedRestrictedTools) {
+              enabledToolNames.add(name);
+            }
+          }
+        }
+
         enabledTools = filterToolsByNames(enabledToolNames);
 
         const result = [
           decision.granted.length
-            ? `已启用工具：${decision.granted.join(", ")}`
-            : "没有启用新的工具。",
-          decision.denied.length
-            ? `拒绝启用高风险工具：${decision.denied.join(", ")}。如需这些工具，用户必须在任务中明确要求相关操作。`
+            ? `已自动启用工具：${decision.granted.join(", ")}`
+            : "",
+          approvedRestrictedTools.length
+            ? `用户已授权启用高风险工具：${approvedRestrictedTools.join(", ")}`
+            : "",
+          decision.denied.length && approvedRestrictedTools.length === 0
+            ? `用户拒绝启用高风险工具：${decision.denied.join(", ")}。禁止尝试绕过。`
             : "",
           decision.unknown.length
             ? `未知工具：${decision.unknown.join(", ")}`

@@ -271,3 +271,24 @@ export async function askExternalPathPermission(access: {
 
   return answer.trim().toLowerCase() === "y";
 }
+
+export async function askToolCapabilityPermission(args: {
+  tools: string[];
+  reason?: string;
+}) {
+  const rl = readline.createInterface({ input, output });
+
+  console.log("\n[Tool Capability Permission Required]");
+  console.log(`请求启用高风险工具：${args.tools.join(", ")}`);
+  if (args.reason) {
+    console.log(`原因：${args.reason}`);
+  }
+
+  const answer = await rl.question(
+    "是否允许本次任务启用这些高风险工具？[y] 允许 / 其他任意键拒绝：",
+  );
+
+  rl.close();
+
+  return answer.trim().toLowerCase() === "y";
+}
