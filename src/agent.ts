@@ -1,8 +1,7 @@
 import type OpenAI from "openai";
-import { client, getModel } from "./model.js";
 import { runtimeContext } from "./runtimeContext.js";
 import { systemPrompt } from "./prompts.js";
-import { tools, runTool } from "./tools/index.js";
+import { runTool } from "./tools/index.js";
 import {
   askExternalPathPermission,
   askUserPermission,
@@ -24,6 +23,7 @@ import {
 } from "./contextManager.js";
 import { selectToolNames } from "./toolRouter.js";
 import { filterToolsByNames } from "./tools/index.js";
+import { createChatCompletionWithRetry } from "./llm.js";
 
 type Message = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 
@@ -47,12 +47,23 @@ export async function runAgent(userInput: string) {
   for (let step = 1; step <= maxSteps; step++) {
     console.log(`\n===== Agent Step ${step} =====`);
 
-    const response = await client.chat.completions.create({
-      model: getModel(),
-      messages: await compactMessagesWithSummary(messages),
-      tools: enabledTools,
-      tool_choice: "auto",
-    });
+    let response;
+
+    try {
+      response = await createChatCompletionWithRetry({
+        messages: await compactMessagesWithSummary(messages),
+        tools: enabledTools,
+        tool_choice: "auto",
+      });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      console.log("\n[Agent Stopped]");
+      console.log(`LLM 请求失败：${errorMessage}`);
+
+      return `LLM 请求失败：${errorMessage}`;
+    }
 
     const message = response.choices[0]?.message;
     if (!message) {
