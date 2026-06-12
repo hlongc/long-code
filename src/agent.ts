@@ -24,6 +24,7 @@ import {
 import { selectToolNames } from "./toolRouter.js";
 import { filterToolsByNames } from "./tools/index.js";
 import { createChatCompletionWithRetry } from "./llm.js";
+import { evaluateToolRequest } from "./toolCapabilityPolicy.js";
 
 type Message = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 
@@ -143,13 +144,28 @@ export async function runAgent(userInput: string) {
       if (toolName === "request_tools") {
         const requestedTools = Array.isArray(args.tools) ? args.tools : [];
 
-        for (const name of requestedTools) {
+        const decision = evaluateToolRequest(requestedTools);
+
+        for (const name of decision.granted) {
           enabledToolNames.add(name);
         }
 
         enabledTools = filterToolsByNames(enabledToolNames);
 
-        const result = `已启用工具：${requestedTools.join(", ")}`;
+        const result = [
+          decision.granted.length
+            ? `已启用工具：${decision.granted.join(", ")}`
+            : "没有启用新的工具。",
+          decision.denied.length
+            ? `拒绝启用高风险工具：${decision.denied.join(", ")}。如需这些工具，用户必须在任务中明确要求相关操作。`
+            : "",
+          decision.unknown.length
+            ? `未知工具：${decision.unknown.join(", ")}`
+            : "",
+          args.reason ? `请求原因：${args.reason}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n");
 
         messages.push({
           role: "tool",

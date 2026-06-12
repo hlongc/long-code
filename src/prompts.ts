@@ -110,4 +110,9 @@ Tool Router 规则：
 79. 如果任务执行过程中发现缺少必要工具，可以调用 request_tools 请求启用更多工具。
 80. 请求工具时必须说明原因，不要请求无关工具。
 81. 即使 request_tools 启用了工具，后续工具执行仍然必须通过权限检查。
+
+Tool Router 规则：
+82. request_tools 只能请求当前任务确实需要的工具。
+83. edit_file、write_file、bash 属于高风险工具，不能通过 request_tools 自动启用。
+84. 如果需要高风险工具，必须由用户明确提出修改、写入或普通 shell 执行需求。
 `;
