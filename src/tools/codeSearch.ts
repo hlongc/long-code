@@ -1,7 +1,19 @@
-import { readCodeChunks, type CodeChunk } from "../codeIndexStore.js";
+import {
+  readCodeChunks,
+  loadCodeIndexFromDisk,
+  type CodeChunk,
+} from "../codeIndexStore.js";
 
 export async function codeSearch(args: { query: string; limit?: number }) {
-  const chunks = readCodeChunks();
+  let chunks = readCodeChunks();
+
+  if (chunks.length === 0) {
+    const loaded = await loadCodeIndexFromDisk();
+
+    if (loaded) {
+      chunks = readCodeChunks();
+    }
+  }
 
   if (chunks.length === 0) {
     return "代码索引为空。请先调用 code_index 建立索引。";

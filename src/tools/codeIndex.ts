@@ -1,7 +1,11 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import fg from "fast-glob";
-import { writeCodeChunks, type CodeChunk } from "../codeIndexStore.js";
+import {
+  writeCodeChunks,
+  saveCodeIndexToDisk,
+  type CodeChunk,
+} from "../codeIndexStore.js";
 import { resolveProjectPath } from "../pathSecurity.js";
 import { runtimeContext } from "../runtimeContext.js";
 
@@ -52,6 +56,7 @@ export async function codeIndex(args: { glob?: string; dir?: string }) {
   }
 
   writeCodeChunks(chunks);
+  await saveCodeIndexToDisk();
 
   const displayIndexDir =
     path.relative(runtimeContext.projectRoot, dirDecision.absPath) || ".";
@@ -61,6 +66,7 @@ export async function codeIndex(args: { glob?: string; dir?: string }) {
     `索引目录：${displayIndexDir}`,
     `文件数量：${files.length}`,
     `代码片段数量：${chunks.length}`,
+    `索引文件：.code-index/index.json`,
   ].join("\n");
 }
 
