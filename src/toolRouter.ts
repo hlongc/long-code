@@ -34,10 +34,27 @@ export function selectToolNames(userInput: string) {
   const wantsSubAgent =
     /review|审查|风险|测试分析|文档|总结|子 agent|subagent/i.test(text);
 
-  return new Set([
+  const selectedTools = new Set([
     ...baseTools,
     ...(wantsEdit ? editTools : []),
     ...(wantsCommand ? commandTools : []),
     ...(wantsSubAgent ? subAgentTools : []),
   ]);
+
+  const wantsCommitMessage =
+    text.includes("commit") ||
+    text.includes("commit message") ||
+    text.includes("提交信息") ||
+    text.includes("提交备注") ||
+    text.includes("提交说明") ||
+    text.includes("angular 风格提交") ||
+    text.includes("angular commit");
+
+  if (wantsCommitMessage) {
+    selectedTools.add("commit_message");
+    selectedTools.add("git_diff");
+    selectedTools.add("git_status");
+  }
+
+  return selectedTools;
 }

@@ -16,6 +16,7 @@ import { runSubAgent } from "./runSubAgent.js";
 import { safeBash } from "./safeBash.js";
 import { codeIndexStatus } from "./codeIndexStatus.js";
 import { gitStatus } from "./gitStatus.js";
+import { commitMessage } from "./commitMessage.js";
 
 export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
@@ -390,6 +391,24 @@ export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "commit_message",
+      description:
+        "根据当前 git diff 和 git status 生成 commit message。仅当用户明确要求生成提交信息时使用。生成提交信息时应优先调用该工具，而不是模型直接手写。",
+      parameters: {
+        type: "object",
+        properties: {
+          style: {
+            type: "string",
+            enum: ["angular", "conventional"],
+            description: "提交信息风格，默认 angular",
+          },
+        },
+      },
+    },
+  },
 ];
 
 export async function runTool(name: string, args: any) {
@@ -428,6 +447,8 @@ export async function runTool(name: string, args: any) {
       return codeIndexStatus();
     case "git_status":
       return gitStatus();
+    case "commit_message":
+      return commitMessage(args);
     default:
       return `未知工具：${name}`;
   }

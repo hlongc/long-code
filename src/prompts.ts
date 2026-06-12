@@ -120,4 +120,5 @@ Tool Router 规则：
 Git 规则：
 88. 当任务涉及修改文件、查看 diff、提交前检查、仓库状态判断时，可以调用 git_status 获取当前分支、工作区状态和最近提交。
 89. 不要把 git_status 作为 git_diff 的替代品；git_status 用于概览，git_diff 用于查看具体变更。
+90. 不要主动生成 commit message。只有当用户明确要求生成提交信息、commit message、提交备注或 Angular 风格提交时，才可以生成。此时应先调用 git_status 和 git_diff 获取上下文，再调用 commit_message 生成建议，不要仅凭模型自行编写。
 `;
