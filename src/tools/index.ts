@@ -227,7 +227,7 @@ export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: "run_check",
       description:
-        "运行项目检查命令，例如 typecheck、lint、test 或 build。修改代码后应使用该工具验证结果。",
+        "运行项目检查命令。不传 script 时会自动按顺序运行当前项目可用的 typecheck、lint、test、build。只有用户明确指定某个脚本时才传 script。",
       parameters: {
         type: "object",
         properties: {

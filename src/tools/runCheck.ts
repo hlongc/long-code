@@ -20,9 +20,9 @@ const preferredNodeScripts = ["typecheck", "lint", "test", "build"];
 export async function runCheck(args: { script?: string }) {
   const project = await detectProject();
 
-  const command = await resolveCheckCommand(project.type, args.script);
+  const commands = await resolveCheckCommands(project.type, args.script);
 
-  if (!command) {
+  if (commands.length === 0) {
     return [
       `没有找到可自动执行的检查命令。`,
       `项目类型：${project.type}`,
@@ -32,6 +32,30 @@ export async function runCheck(args: { script?: string }) {
     ].join("\n");
   }
 
+  const results: string[] = [];
+
+  for (const command of commands) {
+    const result = await runCommand(command);
+
+    results.push(result.output);
+
+    if (result.exitCode !== 0) {
+      results.push("检查失败，已停止后续检查。");
+      break;
+    }
+  }
+
+  return [
+    `项目类型：${project.type}`,
+    `检查数量：${commands.length}`,
+    "",
+    ...results,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+async function runCommand(command: CheckCommand) {
   const result = await execa(command.command, command.args, {
     cwd: runtimeContext.projectRoot,
     timeout: 60_000,
@@ -45,46 +69,48 @@ export async function runCheck(args: { script?: string }) {
 
   const exitCode = "exitCode" in result ? result.exitCode : 0;
 
-  return [
-    `项目类型：${project.type}`,
-    `检查命令：${command.command} ${command.args.join(" ")}`,
-    `选择原因：${command.reason}`,
-    `退出码：${exitCode}`,
-    "",
-    result.stdout ? `stdout:\n${truncate(result.stdout)}` : "",
-    result.stderr ? `stderr:\n${truncate(result.stderr)}` : "",
-    "",
-    exitCode === 0 ? "检查通过 ✅" : "检查失败 ❌",
-  ]
-    .filter(Boolean)
-    .join("\n");
+  return {
+    exitCode,
+    output: [
+      `检查命令：${command.command} ${command.args.join(" ")}`,
+      `选择原因：${command.reason}`,
+      `退出码：${exitCode}`,
+      "",
+      result.stdout ? `stdout:\n${truncate(result.stdout)}` : "",
+      result.stderr ? `stderr:\n${truncate(result.stderr)}` : "",
+      "",
+      exitCode === 0 ? "检查通过 ✅" : "检查失败 ❌",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  };
 }
 
-async function resolveCheckCommand(
+async function resolveCheckCommands(
   projectType: string,
   requestedScript?: string,
-): Promise<CheckCommand | null> {
+): Promise<CheckCommand[]> {
   switch (projectType) {
     case "node":
-      return resolveNodeCheckCommand(requestedScript);
+      return resolveNodeCheckCommands(requestedScript);
 
     case "python":
-      return resolvePythonCheckCommand(requestedScript);
+      return resolvePythonCheckCommands(requestedScript);
 
     case "go":
-      return resolveGoCheckCommand(requestedScript);
+      return [resolveGoCheckCommand(requestedScript)];
 
     case "rust":
-      return resolveRustCheckCommand(requestedScript);
+      return [resolveRustCheckCommand(requestedScript)];
 
     default:
-      return null;
+      return [];
   }
 }
 
-async function resolveNodeCheckCommand(
+async function resolveNodeCheckCommands(
   requestedScript?: string,
-): Promise<CheckCommand | null> {
+): Promise<CheckCommand[]> {
   const packageJsonPath = path.resolve(
     runtimeContext.projectRoot,
     "package.json",
@@ -92,7 +118,7 @@ async function resolveNodeCheckCommand(
   const raw = await fs.readFile(packageJsonPath, "utf-8").catch(() => "");
 
   if (!raw) {
-    return null;
+    return [];
   }
 
   let packageJson: PackageJson;
@@ -100,50 +126,77 @@ async function resolveNodeCheckCommand(
   try {
     packageJson = JSON.parse(raw);
   } catch {
-    return null;
+    return [];
   }
 
   const scripts = packageJson.scripts || {};
-  const scriptName =
-    requestedScript || preferredNodeScripts.find((name) => scripts[name]);
-
-  if (!scriptName || !scripts[scriptName]) {
-    return null;
-  }
-
   const packageManager = detectPackageManager(packageJson.packageManager);
 
-  return {
-    command: packageManager,
-    args: ["run", scriptName],
-    reason: `Node 项目，使用 package.json scripts.${scriptName}`,
-  };
+  if (requestedScript) {
+    if (!scripts[requestedScript]) {
+      return [];
+    }
+
+    return [
+      {
+        command: packageManager,
+        args: ["run", requestedScript],
+        reason: `Node 项目，使用 package.json scripts.${requestedScript}`,
+      },
+    ];
+  }
+
+  return preferredNodeScripts
+    .filter((scriptName) => scripts[scriptName])
+    .map((scriptName) => ({
+      command: packageManager,
+      args: ["run", scriptName],
+      reason: `Node 项目，使用 package.json scripts.${scriptName}`,
+    }));
 }
 
-function resolvePythonCheckCommand(
-  requestedScript?: string,
-): CheckCommand | null {
+function resolvePythonCheckCommands(requestedScript?: string): CheckCommand[] {
   if (requestedScript === "ruff") {
-    return {
-      command: "python",
-      args: ["-m", "ruff", "check", "."],
-      reason: "Python 项目，用户指定 ruff",
-    };
+    return [
+      {
+        command: "python",
+        args: ["-m", "ruff", "check", "."],
+        reason: "Python 项目，用户指定 ruff",
+      },
+    ];
   }
 
   if (requestedScript === "mypy") {
-    return {
-      command: "python",
-      args: ["-m", "mypy", "."],
-      reason: "Python 项目，用户指定 mypy",
-    };
+    return [
+      {
+        command: "python",
+        args: ["-m", "mypy", "."],
+        reason: "Python 项目，用户指定 mypy",
+      },
+    ];
   }
 
-  return {
-    command: "python",
-    args: ["-m", "pytest"],
-    reason: "Python 项目，默认运行 pytest",
-  };
+  if (requestedScript === "pytest") {
+    return [
+      {
+        command: "python",
+        args: ["-m", "pytest"],
+        reason: "Python 项目，用户指定 pytest",
+      },
+    ];
+  }
+
+  if (requestedScript) {
+    return [];
+  }
+
+  return [
+    {
+      command: "python",
+      args: ["-m", "pytest"],
+      reason: "Python 项目，默认运行 pytest",
+    },
+  ];
 }
 
 function resolveGoCheckCommand(requestedScript?: string): CheckCommand {
