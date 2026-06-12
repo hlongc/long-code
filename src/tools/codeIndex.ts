@@ -5,6 +5,7 @@ import {
   writeCodeChunks,
   saveCodeIndexToDisk,
   type CodeChunk,
+  type IndexedFileMeta,
 } from "../codeIndexStore.js";
 import { resolveProjectPath } from "../pathSecurity.js";
 import { runtimeContext } from "../runtimeContext.js";
@@ -41,9 +42,16 @@ export async function codeIndex(args: { glob?: string; dir?: string }) {
   });
 
   const chunks: CodeChunk[] = [];
+  const fileMetas: IndexedFileMeta[] = [];
 
   for (const file of files) {
     const absPath = path.resolve(dirDecision.absPath, file);
+    const stat = await fs.stat(absPath).catch(() => null);
+
+    if (!stat || !stat.isFile()) {
+      continue;
+    }
+
     const content = await fs.readFile(absPath, "utf-8").catch(() => "");
 
     if (!content.trim()) {
@@ -52,11 +60,17 @@ export async function codeIndex(args: { glob?: string; dir?: string }) {
 
     const displayPath = path.relative(runtimeContext.projectRoot, absPath);
 
+    fileMetas.push({
+      file: displayPath,
+      size: stat.size,
+      mtimeMs: stat.mtimeMs,
+    });
+
     chunks.push(...splitFileIntoChunks(displayPath, content));
   }
 
   writeCodeChunks(chunks);
-  await saveCodeIndexToDisk();
+  await saveCodeIndexToDisk(fileMetas);
 
   const displayIndexDir =
     path.relative(runtimeContext.projectRoot, dirDecision.absPath) || ".";
