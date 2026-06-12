@@ -1,3 +1,9 @@
+export type CheckRecord = {
+  script?: string;
+  status: "passed" | "failed" | "unknown";
+  summary: string;
+};
+
 export type AgentState = {
   userInput: string;
   currentStep: number;
@@ -7,11 +13,7 @@ export type AgentState = {
   deniedActions: string[];
   toolErrors: string[];
   inspectedDiff: boolean;
-  lastCheck?: {
-    script?: string;
-    status: "passed" | "failed" | "unknown";
-    summary: string;
-  };
+  checks: CheckRecord[];
 };
 
 export function createAgentState(userInput: string): AgentState {
@@ -24,6 +26,7 @@ export function createAgentState(userInput: string): AgentState {
     deniedActions: [],
     toolErrors: [],
     inspectedDiff: false,
+    checks: [],
   };
 }
 
@@ -85,7 +88,7 @@ export function recordToolEffect(args: {
   }
 
   if (toolName === "run_check") {
-    state.lastCheck = {
+    state.checks.push({
       script:
         typeof toolArgs?.script === "string" ? toolArgs.script : undefined,
       status: result.includes("检查通过")
@@ -94,7 +97,7 @@ export function recordToolEffect(args: {
           ? "failed"
           : "unknown",
       summary: summarizeCheckResult(result),
-    };
+    });
   }
 
   if (!success) {
@@ -124,14 +127,16 @@ export function formatAgentStateSummary(state: AgentState) {
     state.toolErrors.length
       ? `工具错误：${state.toolErrors.slice(-5).join(" | ")}`
       : "",
-    state.lastCheck
+    state.checks.length
       ? [
-          `最后检查：${state.lastCheck.status}`,
-          state.lastCheck.script ? `检查脚本：${state.lastCheck.script}` : "",
-          `检查摘要：${state.lastCheck.summary}`,
-        ]
-          .filter(Boolean)
-          .join("\n")
+          "项目检查记录：",
+          ...state.checks.map((check, index) =>
+            [
+              `${index + 1}. ${check.script || "auto"}: ${check.status}`,
+              check.summary,
+            ].join("\n"),
+          ),
+        ].join("\n")
       : "",
   ]
     .filter(Boolean)
