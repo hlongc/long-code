@@ -18,7 +18,10 @@ import {
   isPermissionAllowedForSession,
 } from "./permissionSession.js";
 import { renderMarkdown } from "./terminalMarkdown.js";
-import { compactMessages, compactToolResult } from "./contextManager.js";
+import {
+  compactMessagesWithSummary,
+  compactToolResult,
+} from "./contextManager.js";
 
 type Message = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 
@@ -41,7 +44,7 @@ export async function runAgent(userInput: string) {
 
     const response = await client.chat.completions.create({
       model: getModel(),
-      messages: compactMessages(messages),
+      messages: await compactMessagesWithSummary(messages),
       tools,
       tool_choice: "auto",
     });
