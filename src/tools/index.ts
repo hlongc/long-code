@@ -396,7 +396,7 @@ export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: "commit_message",
       description:
-        "根据当前 git diff 和 git status 生成 commit message。仅当用户明确要求生成提交信息时使用。生成提交信息时应优先调用该工具，而不是模型直接手写。",
+        "根据当前 git status 和 git diff 生成 commit message。仅当用户明确要求生成提交信息时使用。生成提交信息时应先调用 git_status 和 git_diff 获取上下文，再调用该工具。",
       parameters: {
         type: "object",
         properties: {
@@ -405,7 +405,16 @@ export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
             enum: ["angular", "conventional"],
             description: "提交信息风格，默认 angular",
           },
+          status: {
+            type: "string",
+            description: "git_status 工具返回的完整结果",
+          },
+          diff: {
+            type: "string",
+            description: "git_diff 工具返回的完整结果",
+          },
         },
+        required: ["status", "diff"],
       },
     },
   },
