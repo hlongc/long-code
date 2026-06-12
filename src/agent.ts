@@ -22,10 +22,15 @@ import {
   compactMessagesWithSummary,
   compactToolResult,
 } from "./contextManager.js";
+import { selectToolNames } from "./toolRouter.js";
+import { filterToolsByNames } from "./tools/index.js";
 
 type Message = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 
 export async function runAgent(userInput: string) {
+  const enabledToolNames = selectToolNames(userInput);
+  const enabledTools = filterToolsByNames(enabledToolNames);
+
   const messages: Message[] = [
     {
       role: "system",
@@ -45,7 +50,7 @@ export async function runAgent(userInput: string) {
     const response = await client.chat.completions.create({
       model: getModel(),
       messages: await compactMessagesWithSummary(messages),
-      tools,
+      tools: enabledTools,
       tool_choice: "auto",
     });
 

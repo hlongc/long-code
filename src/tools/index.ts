@@ -391,3 +391,13 @@ export async function runTool(name: string, args: any) {
       return `未知工具：${name}`;
   }
 }
+
+export function filterToolsByNames(names: Set<string>) {
+  return tools.filter((tool) => {
+    if (tool.type !== "function") {
+      return false;
+    }
+
+    return names.has(tool.function.name);
+  });
+}
