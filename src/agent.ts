@@ -26,12 +26,22 @@ import { selectToolNames } from "./toolRouter.js";
 import { filterToolsByNames } from "./tools/index.js";
 import { createChatCompletionWithRetry } from "./llm.js";
 import { evaluateToolRequest } from "./toolCapabilityPolicy.js";
+import {
+  createAgentState,
+  formatAgentStateSummary,
+  recordDeniedAction,
+  recordToolEffect,
+} from "./agentState.js";
 
 type Message = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 
 export async function runAgent(userInput: string) {
+  const agentState = createAgentState(userInput);
+
   const enabledToolNames = selectToolNames(userInput);
   let enabledTools = filterToolsByNames(enabledToolNames);
+
+  agentState.enabledTools = [...enabledToolNames];
 
   const messages: Message[] = [
     {
@@ -48,6 +58,7 @@ export async function runAgent(userInput: string) {
 
   for (let step = 1; step <= maxSteps; step++) {
     console.log(`\n===== Agent Step ${step} =====`);
+    agentState.currentStep = step;
 
     let response;
 
@@ -64,10 +75,13 @@ export async function runAgent(userInput: string) {
       console.log("\n[Agent Stopped]");
       console.log(`LLM 请求失败：${errorMessage}`);
 
+      agentState.toolErrors.push(`[llm] ${errorMessage}`);
+
       return `LLM 请求失败：${errorMessage}`;
     }
 
     const message = response.choices[0]?.message;
+
     if (!message) {
       throw new Error("模型没有返回消息");
     }
@@ -76,9 +90,12 @@ export async function runAgent(userInput: string) {
 
     // 没有工具调用，说明模型已经准备好回答
     if (!message.tool_calls || message.tool_calls.length === 0) {
-      console.log("\n===== Final Answer =====\n");
-      const finalContent = message.content || "";
+      console.log("\n[Agent State]");
+      console.log(formatAgentStateSummary(agentState));
 
+      console.log("\n===== Final Answer =====\n");
+
+      const finalContent = message.content || "";
       const rendered = await renderMarkdown(finalContent);
 
       console.log(rendered);
@@ -86,15 +103,18 @@ export async function runAgent(userInput: string) {
       return finalContent;
     }
 
-    // 执行工具调用
     for (const toolCall of message.tool_calls) {
       if (toolCall.type !== "function") {
-        console.log(`[Skip Tool Call] 不支持的工具类型：${toolCall.type}`);
+        const errorMessage = `不支持的工具类型：${toolCall.type}`;
+
+        console.log(`[Skip Tool Call] ${errorMessage}`);
+
+        agentState.toolErrors.push(`[unknown] ${errorMessage}`);
 
         messages.push({
           role: "tool",
           tool_call_id: toolCall.id,
-          content: `不支持的工具类型：${toolCall.type}`,
+          content: errorMessage,
         });
 
         continue;
@@ -111,6 +131,8 @@ export async function runAgent(userInput: string) {
         const errorMessage = `工具参数解析失败：${rawArgs}`;
 
         console.log(`\n[Tool Args Error] ${errorMessage}`);
+
+        agentState.toolErrors.push(`[${toolName}] ${errorMessage}`);
 
         messages.push({
           role: "tool",
@@ -130,6 +152,8 @@ export async function runAgent(userInput: string) {
         if (!dangerCheck.allowed) {
           const deniedMessage = `拒绝执行：${dangerCheck.reason}。这是破坏性操作，禁止尝试通过其他等价命令绕过。`;
 
+          recordDeniedAction(agentState, deniedMessage);
+
           console.log(`\n[Permission Denied] ${deniedMessage}`);
 
           messages.push({
@@ -143,7 +167,11 @@ export async function runAgent(userInput: string) {
       }
 
       if (toolName === "request_tools") {
-        const requestedTools = Array.isArray(args.tools) ? args.tools : [];
+        const requestedTools = Array.isArray(args.tools)
+          ? args.tools.filter(
+              (name: unknown): name is string => typeof name === "string",
+            )
+          : [];
 
         const decision = evaluateToolRequest(requestedTools);
 
@@ -169,6 +197,23 @@ export async function runAgent(userInput: string) {
         }
 
         enabledTools = filterToolsByNames(enabledToolNames);
+        agentState.enabledTools = [...enabledToolNames];
+
+        if (
+          decision.denied.length > 0 &&
+          approvedRestrictedTools.length === 0
+        ) {
+          recordDeniedAction(
+            agentState,
+            `用户拒绝启用高风险工具：${decision.denied.join(", ")}`,
+          );
+        }
+
+        if (decision.unknown.length > 0) {
+          agentState.toolErrors.push(
+            `[request_tools] 未知工具：${decision.unknown.join(", ")}`,
+          );
+        }
 
         const result = [
           decision.granted.length
@@ -208,6 +253,8 @@ export async function runAgent(userInput: string) {
         if (!allowed) {
           const deniedMessage = `用户拒绝访问项目外路径：${externalPathAccess.absPath}`;
 
+          recordDeniedAction(agentState, deniedMessage);
+
           console.log(`\n[External Path Denied] ${deniedMessage}`);
 
           messages.push({
@@ -233,6 +280,8 @@ export async function runAgent(userInput: string) {
         if (!allowed) {
           const deniedMessage = `用户拒绝或系统阻止访问敏感文件：${sensitiveFileAccess.inputPath}，原因：${sensitiveFileAccess.reason}`;
 
+          recordDeniedAction(agentState, deniedMessage);
+
           console.log(`\n[Sensitive File Denied] ${deniedMessage}`);
 
           messages.push({
@@ -252,6 +301,8 @@ export async function runAgent(userInput: string) {
           if (permissionResult === "deny") {
             const deniedMessage =
               "用户拒绝执行该工具调用，禁止尝试通过其他等价方式绕过。";
+
+            recordDeniedAction(agentState, deniedMessage);
 
             console.log(`\n[Permission Denied] ${deniedMessage}`);
 
@@ -273,10 +324,12 @@ export async function runAgent(userInput: string) {
       }
 
       let result: string;
+      let toolSuccess = true;
 
       try {
         result = String(await runTool(toolName, args));
       } catch (error) {
+        toolSuccess = false;
         result =
           error instanceof Error
             ? `工具执行失败：${error.message}`
@@ -292,6 +345,14 @@ export async function runAgent(userInput: string) {
         role: "tool",
         tool_call_id: toolCall.id,
         content: compactedResult,
+      });
+
+      recordToolEffect({
+        state: agentState,
+        toolName,
+        toolArgs: args,
+        result,
+        success: toolSuccess,
       });
     }
   }
