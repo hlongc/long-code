@@ -44,6 +44,15 @@ export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
             type: "string",
             description: "要读取的文件路径",
           },
+          startLine: {
+            type: "number",
+            description:
+              "可选，开始读取的行号，从 1 开始。适合读取大文件的局部内容。",
+          },
+          endLine: {
+            type: "number",
+            description: "可选，结束读取的行号，包含该行。",
+          },
         },
         required: ["file"],
       },
