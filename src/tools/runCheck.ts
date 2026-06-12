@@ -1,58 +1,39 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { execa } from "execa";
+import { runtimeContext } from "../runtimeContext.js";
+import { detectProject } from "../projectDetector.js";
 
 type PackageJson = {
+  packageManager?: string;
   scripts?: Record<string, string>;
 };
 
-const preferredScripts = ["typecheck", "lint", "test", "build"];
+type CheckCommand = {
+  command: string;
+  args: string[];
+  reason: string;
+};
+
+const preferredNodeScripts = ["typecheck", "lint", "test", "build"];
 
 export async function runCheck(args: { script?: string }) {
-  const packageJsonPath = path.resolve(process.cwd(), "package.json");
+  const project = await detectProject();
 
-  const raw = await fs.readFile(packageJsonPath, "utf-8").catch(() => "");
+  const command = await resolveCheckCommand(project.type, args.script);
 
-  if (!raw) {
-    return "run_check 失败：当前目录没有 package.json";
-  }
-
-  let packageJson: PackageJson;
-
-  try {
-    packageJson = JSON.parse(raw);
-  } catch {
-    return "run_check 失败：package.json 不是合法 JSON";
-  }
-
-  const scripts = packageJson.scripts || {};
-  const scriptName =
-    args.script || preferredScripts.find((name) => scripts[name]);
-
-  if (!scriptName) {
-    const availableScripts = Object.keys(scripts);
-
+  if (!command) {
     return [
-      "没有找到可自动执行的检查脚本。",
-      availableScripts.length > 0
-        ? `当前可用 scripts: ${availableScripts.join(", ")}`
-        : "当前 package.json 没有 scripts。",
+      `没有找到可自动执行的检查命令。`,
+      `项目类型：${project.type}`,
+      `检测到的清单文件：${project.files.join(", ") || "无"}`,
       "",
-      "建议：如需验证项目，可以先添加 typecheck、lint、test 或 build 脚本。",
+      `建议：Node 项目添加 typecheck/lint/test/build 脚本；Python 项目配置 pytest/ruff/mypy；Go 项目使用 go test；Rust 项目使用 cargo check/test。`,
     ].join("\n");
   }
-
-  if (!scripts[scriptName]) {
-    return [
-      `run_check 失败：package.json 中不存在脚本：${scriptName}`,
-      `当前可用 scripts: ${Object.keys(scripts).join(", ") || "无"}`,
-    ].join("\n");
-  }
-
-  const command = getPackageManagerCommand(scriptName);
 
   const result = await execa(command.command, command.args, {
-    cwd: process.cwd(),
+    cwd: runtimeContext.projectRoot,
     timeout: 60_000,
   }).catch((error) => {
     return {
@@ -65,7 +46,9 @@ export async function runCheck(args: { script?: string }) {
   const exitCode = "exitCode" in result ? result.exitCode : 0;
 
   return [
+    `项目类型：${project.type}`,
     `检查命令：${command.command} ${command.args.join(" ")}`,
+    `选择原因：${command.reason}`,
     `退出码：${exitCode}`,
     "",
     result.stdout ? `stdout:\n${truncate(result.stdout)}` : "",
@@ -77,12 +60,130 @@ export async function runCheck(args: { script?: string }) {
     .join("\n");
 }
 
-function getPackageManagerCommand(scriptName: string) {
-  // 先简单默认 pnpm，后面可以根据 lockfile 判断 npm/yarn/bun
+async function resolveCheckCommand(
+  projectType: string,
+  requestedScript?: string,
+): Promise<CheckCommand | null> {
+  switch (projectType) {
+    case "node":
+      return resolveNodeCheckCommand(requestedScript);
+
+    case "python":
+      return resolvePythonCheckCommand(requestedScript);
+
+    case "go":
+      return resolveGoCheckCommand(requestedScript);
+
+    case "rust":
+      return resolveRustCheckCommand(requestedScript);
+
+    default:
+      return null;
+  }
+}
+
+async function resolveNodeCheckCommand(
+  requestedScript?: string,
+): Promise<CheckCommand | null> {
+  const packageJsonPath = path.resolve(
+    runtimeContext.projectRoot,
+    "package.json",
+  );
+  const raw = await fs.readFile(packageJsonPath, "utf-8").catch(() => "");
+
+  if (!raw) {
+    return null;
+  }
+
+  let packageJson: PackageJson;
+
+  try {
+    packageJson = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+
+  const scripts = packageJson.scripts || {};
+  const scriptName =
+    requestedScript || preferredNodeScripts.find((name) => scripts[name]);
+
+  if (!scriptName || !scripts[scriptName]) {
+    return null;
+  }
+
+  const packageManager = detectPackageManager(packageJson.packageManager);
+
   return {
-    command: "pnpm",
+    command: packageManager,
     args: ["run", scriptName],
+    reason: `Node 项目，使用 package.json scripts.${scriptName}`,
   };
+}
+
+function resolvePythonCheckCommand(
+  requestedScript?: string,
+): CheckCommand | null {
+  if (requestedScript === "ruff") {
+    return {
+      command: "python",
+      args: ["-m", "ruff", "check", "."],
+      reason: "Python 项目，用户指定 ruff",
+    };
+  }
+
+  if (requestedScript === "mypy") {
+    return {
+      command: "python",
+      args: ["-m", "mypy", "."],
+      reason: "Python 项目，用户指定 mypy",
+    };
+  }
+
+  return {
+    command: "python",
+    args: ["-m", "pytest"],
+    reason: "Python 项目，默认运行 pytest",
+  };
+}
+
+function resolveGoCheckCommand(requestedScript?: string): CheckCommand {
+  if (requestedScript === "test" || !requestedScript) {
+    return {
+      command: "go",
+      args: ["test", "./..."],
+      reason: "Go 项目，运行 go test ./...",
+    };
+  }
+
+  return {
+    command: "go",
+    args: ["test", "./..."],
+    reason: `Go 项目暂不支持指定脚本 ${requestedScript}，回退到 go test ./...`,
+  };
+}
+
+function resolveRustCheckCommand(requestedScript?: string): CheckCommand {
+  if (requestedScript === "test") {
+    return {
+      command: "cargo",
+      args: ["test"],
+      reason: "Rust 项目，用户指定 cargo test",
+    };
+  }
+
+  return {
+    command: "cargo",
+    args: ["check"],
+    reason: "Rust 项目，默认运行 cargo check",
+  };
+}
+
+function detectPackageManager(packageManager?: string) {
+  if (packageManager?.startsWith("pnpm")) return "pnpm";
+  if (packageManager?.startsWith("yarn")) return "yarn";
+  if (packageManager?.startsWith("npm")) return "npm";
+
+  return "pnpm";
 }
 
 function truncate(text: string) {

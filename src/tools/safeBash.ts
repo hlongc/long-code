@@ -6,7 +6,15 @@ type SafeBashArgs = {
   args?: string[];
 };
 
-const allowedCommands = new Set(["git", "node", "npm", "pnpm"]);
+const allowedCommands = new Set([
+  "git",
+  "node",
+  "npm",
+  "pnpm",
+  "python",
+  "go",
+  "cargo",
+]);
 
 const allowedGitSubcommands = new Set(["status", "diff", "branch", "log"]);
 
