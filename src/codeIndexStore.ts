@@ -69,3 +69,39 @@ export async function loadCodeIndexFromDisk() {
 export function getCodeIndexFilePath() {
   return path.join(runtimeContext.projectRoot, ".code-index", "index.json");
 }
+
+export async function getCodeIndexStatus() {
+  const indexFile = getCodeIndexFilePath();
+
+  const raw = await fs.readFile(indexFile, "utf-8").catch(() => "");
+
+  if (!raw) {
+    return {
+      exists: false,
+      indexFile,
+      chunks: 0,
+      createdAt: "",
+      projectRoot: runtimeContext.projectRoot,
+    };
+  }
+
+  try {
+    const payload = JSON.parse(raw) as CodeIndexFile;
+
+    return {
+      exists: true,
+      indexFile,
+      chunks: payload.chunks?.length || 0,
+      createdAt: payload.createdAt,
+      projectRoot: payload.projectRoot,
+    };
+  } catch {
+    return {
+      exists: false,
+      indexFile,
+      chunks: 0,
+      createdAt: "",
+      projectRoot: runtimeContext.projectRoot,
+    };
+  }
+}

@@ -14,6 +14,7 @@ import { codeIndex } from "./codeIndex.js";
 import { codeSearch } from "./codeSearch.js";
 import { runSubAgent } from "./runSubAgent.js";
 import { safeBash } from "./safeBash.js";
+import { codeIndexStatus } from "./codeIndexStatus.js";
 
 export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
@@ -338,6 +339,18 @@ export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "code_index_status",
+      description:
+        "检查当前项目是否已有持久化代码索引。搜索已有索引前应优先调用该工具，只有索引不存在时才调用 code_index。",
+      parameters: {
+        type: "object",
+        properties: {},
+      },
+    },
+  },
 ];
 
 export async function runTool(name: string, args: any) {
@@ -372,6 +385,8 @@ export async function runTool(name: string, args: any) {
       return runSubAgent(args);
     case "safe_bash":
       return safeBash(args);
+    case "code_index_status":
+      return codeIndexStatus();
     default:
       return `未知工具：${name}`;
   }
