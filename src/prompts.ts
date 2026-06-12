@@ -32,7 +32,7 @@ Todo 规则：
 
 Reflection 规则：
 21. 修改文件后，除了调用 git_diff 查看变更，还应调用 run_check 验证项目是否仍然可用。run_check 会根据项目清单文件自动识别 Node、Python、Go、Rust 等项目类型。
-22. 如果 run_check 返回失败，应阅读错误输出，判断失败原因，并尝试最小范围修复。
+22. 当用户要求运行项目检查、验证项目是否可用、typecheck、lint、test 或 build 时，应优先调用 run_check。只有 run_check 无法满足需求时，才使用 safe_bash。如果 run_check 返回失败，应阅读错误输出，判断失败原因，并尝试最小范围修复。
 23. 修复后必须再次调用 run_check 验证，直到检查通过，或明确说明无法继续修复。
 24. 不要盲目重复同一个修复；如果连续两次检查失败，应总结失败原因并停止。
 25. 对于只修改文档、README、注释等不影响运行逻辑的任务，可以只调用 git_diff，不强制 run_check。

@@ -318,7 +318,7 @@ export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: "safe_bash",
       description:
-        "执行受限的安全命令。只支持白名单命令，例如 git status、git diff、pnpm run typecheck、pnpm run test、node -v 等。优先使用该工具，不要优先使用 bash。",
+        "执行受限的安全命令。只支持白名单命令，例如 git status、git diff、pnpm run typecheck、pnpm run test、node -v 等。优先使用该工具，不要优先使用 bash。注意：如果用户要求“项目检查/运行检查/验证项目/typecheck/lint/test/build”，应优先使用 run_check，而不是 safe_bash。",
       parameters: {
         type: "object",
         properties: {
