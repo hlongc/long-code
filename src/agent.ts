@@ -32,6 +32,7 @@ import {
   recordDeniedAction,
   recordToolEffect,
 } from "./agentState.js";
+import { refineFinalAnswer } from "./finalAnswer.js";
 
 type Message = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 
@@ -95,7 +96,13 @@ export async function runAgent(userInput: string) {
 
       console.log("\n===== Final Answer =====\n");
 
-      const finalContent = message.content || "";
+      const draftFinalContent = message.content || "";
+
+      const finalContent = await refineFinalAnswer({
+        draft: draftFinalContent,
+        agentState,
+      });
+
       const rendered = await renderMarkdown(finalContent);
 
       console.log(rendered);

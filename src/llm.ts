@@ -14,17 +14,20 @@ export async function createChatCompletionWithRetry(args: {
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      return await client.chat.completions.create(
+      const body: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming =
         {
           model: getModel(),
           messages: args.messages,
-          tools: args.tools,
-          tool_choice: args.tool_choice,
-        },
-        {
-          timeout: requestTimeoutMs,
-        },
-      );
+        };
+
+      if (args.tools.length > 0) {
+        body.tools = args.tools;
+        body.tool_choice = args.tool_choice;
+      }
+
+      return await client.chat.completions.create(body, {
+        timeout: requestTimeoutMs,
+      });
     } catch (error) {
       const message = getErrorMessage(error);
 
