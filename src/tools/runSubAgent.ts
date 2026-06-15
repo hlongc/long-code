@@ -1,4 +1,4 @@
-import { client, getModel } from "../model.js";
+import { createChatCompletionWithRetry } from "../llm.js";
 import { subAgents, type SubAgentName } from "../subagents.js";
 
 export async function runSubAgent(args: {
@@ -15,8 +15,7 @@ export async function runSubAgent(args: {
     ].join("\n");
   }
 
-  const response = await client.chat.completions.create({
-    model: getModel(),
+  const response = await createChatCompletionWithRetry({
     messages: [
       {
         role: "system",
@@ -31,6 +30,8 @@ export async function runSubAgent(args: {
         ].join("\n"),
       },
     ],
+    tools: [],
+    tool_choice: "auto",
   });
 
   const content = response.choices[0]?.message?.content;
