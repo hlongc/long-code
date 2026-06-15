@@ -4,6 +4,12 @@ export type CheckRecord = {
   summary: string;
 };
 
+export type SubAgentCallRecord = {
+  agent: string;
+  task?: string;
+  summary: string;
+};
+
 export type AgentState = {
   userInput: string;
   currentStep: number;
@@ -14,6 +20,7 @@ export type AgentState = {
   toolErrors: string[];
   inspectedDiff: boolean;
   checks: CheckRecord[];
+  subAgentCalls: SubAgentCallRecord[];
   git?: {
     branch?: string;
     dirty: boolean;
@@ -33,6 +40,7 @@ export function createAgentState(userInput: string): AgentState {
     toolErrors: [],
     inspectedDiff: false,
     checks: [],
+    subAgentCalls: [],
   };
 }
 
@@ -110,9 +118,26 @@ export function recordToolEffect(args: {
     });
   }
 
+  if (toolName === "run_subagent") {
+    state.subAgentCalls.push({
+      agent: typeof toolArgs?.agent === "string" ? toolArgs.agent : "unknown",
+      task: typeof toolArgs?.task === "string" ? toolArgs.task : undefined,
+      summary: summarizeSubAgentResult(result),
+    });
+  }
+
   if (!success) {
     state.toolErrors.push(`[${toolName}] ${result}`);
   }
+}
+
+function summarizeSubAgentResult(result: string) {
+  const lines = result
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  return lines.slice(0, 12).join("\n");
 }
 
 function parseGitStatus(result: string) {
@@ -149,13 +174,7 @@ export function formatAgentStateSummary(state: AgentState) {
     "## Agent State",
     `当前步骤：${state.currentStep}`,
     `启用工具：${state.enabledTools.join(", ") || "无"}`,
-    state.touchedFiles.length
-      ? `读取/触达文件：${state.touchedFiles.join(", ")}`
-      : "",
-    state.modifiedFiles.length
-      ? `修改文件：${state.modifiedFiles.join(", ")}`
-      : "",
-    state.inspectedDiff ? "已查看 git diff：是" : "",
+
     state.git
       ? [
           `当前分支：${state.git.branch || "unknown"}`,
@@ -165,15 +184,36 @@ export function formatAgentStateSummary(state: AgentState) {
           .filter(Boolean)
           .join("\n")
       : "",
+
     state.git?.statusLines.length
       ? `工作区变更文件：${state.git.statusLines.join(", ")}`
       : "",
-    state.deniedActions.length
-      ? `被拒绝操作：${state.deniedActions.join(" | ")}`
+
+    state.touchedFiles.length
+      ? `读取/触达文件：${state.touchedFiles.join(", ")}`
       : "",
-    state.toolErrors.length
-      ? `工具错误：${state.toolErrors.slice(-5).join(" | ")}`
+
+    state.modifiedFiles.length
+      ? `修改文件：${state.modifiedFiles.join(", ")}`
       : "",
+
+    state.inspectedDiff ? "已查看 git diff：是" : "",
+
+    state.subAgentCalls.length
+      ? [
+          "子 Agent 调用记录：",
+          ...state.subAgentCalls.map((call, index) =>
+            [
+              `${index + 1}. ${call.agent}`,
+              call.task ? `任务：${call.task}` : "",
+              `摘要：${call.summary}`,
+            ]
+              .filter(Boolean)
+              .join("\n"),
+          ),
+        ].join("\n")
+      : "",
+
     state.checks.length
       ? [
           "项目检查记录：",
@@ -184,6 +224,14 @@ export function formatAgentStateSummary(state: AgentState) {
             ].join("\n"),
           ),
         ].join("\n")
+      : "",
+
+    state.deniedActions.length
+      ? `被拒绝操作：${state.deniedActions.join(" | ")}`
+      : "",
+
+    state.toolErrors.length
+      ? `工具错误：${state.toolErrors.slice(-5).join(" | ")}`
       : "",
   ]
     .filter(Boolean)
